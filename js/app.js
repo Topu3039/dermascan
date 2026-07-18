@@ -208,7 +208,6 @@ document.querySelectorAll(".lang-btn").forEach(btn=>{
 });
 
 /* ---------------- 7. API KEY GATE ---------------- */
-$("back-to-lang").addEventListener("click",()=>showScreen("lang-gate"));
 $("save-key-btn").addEventListener("click",()=>{
   const val = $("api-key-input").value.trim();
   if (!val.startsWith("sk-ant-") || val.length < 20){ toast(STR[state.lang].errKey); return; }
