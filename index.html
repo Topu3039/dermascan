@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DermaScan — AI Skin Reading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ambient background -->
+<div class="bg-scene" aria-hidden="true">
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+  <div class="grid-overlay"></div>
+</div>
+
+<!-- ============ LANGUAGE GATE ============ -->
+<section id="lang-gate" class="screen active">
+  <div class="gate-card">
+    <p class="eyebrow">01 · Choose your reading language</p>
+    <h1 class="display-xl">Read your <em>skin</em>,<br>in your language.</h1>
+    <p class="sub">DermaScan looks at your face and tells you, plainly, what's going on with your skin — and what to do about it.</p>
+
+    <div class="lang-grid" id="lang-grid">
+      <button class="lang-btn" data-lang="en"><span class="lang-name">English</span><span class="lang-native">English</span></button>
+      <button class="lang-btn" data-lang="bn"><span class="lang-name">Bangla</span><span class="lang-native">বাংলা</span></button>
+      <button class="lang-btn" data-lang="hi"><span class="lang-name">Hindi</span><span class="lang-native">हिन्दी</span></button>
+      <button class="lang-btn" data-lang="de"><span class="lang-name">German</span><span class="lang-native">Deutsch</span></button>
+      <button class="lang-btn" data-lang="fr"><span class="lang-name">French</span><span class="lang-native">Français</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ API KEY SETUP (client-side, stored locally only) ============ -->
+<section id="key-gate" class="screen">
+  <div class="gate-card narrow">
+    <p class="eyebrow" data-i18n="eyebrow02">02 · Connect the reader</p>
+    <h2 class="display-md" data-i18n="keyTitle">One-time setup</h2>
+    <p class="sub" data-i18n="keyDesc">DermaScan uses Claude's vision model to read your photo. Paste your own Anthropic API key below — it's saved only in this browser, never sent anywhere except Anthropic's API.</p>
+    <input type="password" id="api-key-input" class="text-input" placeholder="sk-ant-..." autocomplete="off">
+    <button class="btn-primary" id="save-key-btn" data-i18n="keySave">Save & continue</button>
+    <p class="hint" data-i18n="keyHint">Don't have a key? Create one at console.anthropic.com — it takes about a minute.</p>
+    <button class="btn-ghost" id="back-to-lang" data-i18n="back">← back</button>
+  </div>
+</section>
+
+<!-- ============ CAPTURE ============ -->
+<section id="capture-gate" class="screen">
+  <div class="gate-card wide">
+    <p class="eyebrow" data-i18n="eyebrow03">03 · Show your face</p>
+    <h2 class="display-md" data-i18n="captureTitle">Good light. Bare face. No filters.</h2>
+    <p class="sub" data-i18n="captureDesc">For the most accurate reading, use natural daylight and remove makeup if you can.</p>
+
+    <div class="capture-stage">
+      <div class="frame" id="frame">
+        <video id="camera-video" autoplay playsinline muted></video>
+        <img id="preview-img" alt="preview" style="display:none">
+        <div class="scan-sweep" id="scan-sweep"></div>
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+      </div>
+      <canvas id="capture-canvas" style="display:none"></canvas>
+
+      <div class="capture-controls" id="capture-controls">
+        <button class="btn-secondary" id="open-camera-btn" data-i18n="openCamera">Turn on camera</button>
+        <button class="btn-secondary" id="upload-btn" data-i18n="uploadPhoto">Upload a photo</button>
+        <input type="file" id="file-input" accept="image/*" style="display:none">
+      </div>
+      <button class="btn-primary" id="snap-btn" style="display:none" data-i18n="takeShot">Take the photo</button>
+      <div class="retake-row" id="retake-row" style="display:none">
+        <button class="btn-ghost" id="retake-btn" data-i18n="retake">↺ retake</button>
+        <button class="btn-primary" id="analyze-btn" data-i18n="analyze">Analyze my skin</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANALYZING ============ -->
+<section id="loading-gate" class="screen">
+  <div class="gate-card narrow center">
+    <div class="loader-ring"></div>
+    <h2 class="display-sm" data-i18n="loadingTitle">Reading your skin…</h2>
+    <p class="sub loading-msg" id="loading-msg" data-i18n="loadingMsg1">Mapping tone, texture and pores</p>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section id="results-gate" class="screen">
+  <div class="results-wrap">
+    <p class="eyebrow" data-i18n="eyebrow04">04 · Your reading</p>
+    <h2 class="display-md" data-i18n="resultsTitle">Here's what your skin is telling us</h2>
+
+    <div class="result-layout">
+      <div class="result-photo">
+        <img id="result-img" alt="your photo">
+      </div>
+      <div class="issue-list" id="issue-list"><!-- injected --></div>
+    </div>
+
+    <div class="routine-cta">
+      <button class="btn-primary lg" id="solution-btn" data-i18n="getSolutions">Get my natural routine</button>
+    </div>
+
+    <div id="routine-panel" class="routine-panel" style="display:none">
+      <h3 class="display-sm" data-i18n="routineTitle">Your natural routine</h3>
+      <div class="routine-table" id="routine-table"><!-- injected --></div>
+
+      <div class="daily-routine">
+        <div class="routine-block">
+          <h4 data-i18n="morning">Morning</h4>
+          <ul id="am-list"></ul>
+        </div>
+        <div class="routine-block">
+          <h4 data-i18n="night">Night</h4>
+          <ul id="pm-list"></ul>
+        </div>
+      </div>
+
+      <div class="lifestyle-avoid">
+        <div class="do-block">
+          <h4 data-i18n="lifestyleTitle">Habits that help</h4>
+          <ul id="lifestyle-list"></ul>
+        </div>
+        <div class="avoid-block">
+          <h4 data-i18n="avoidTitle">Avoid these</h4>
+          <ul id="avoid-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="thankyou-block">
+      <p class="thankyou" data-i18n="thankYou">Thank you for scanning with DermaScan 🌿</p>
+      <p class="share-prompt" data-i18n="sharePrompt">Share this with a friend who needs it too:</p>
+      <div class="share-row">
+        <a class="share-btn wa" id="share-wa" target="_blank" rel="noopener">WhatsApp</a>
+        <a class="share-btn fb" id="share-fb" target="_blank" rel="noopener">Facebook</a>
+        <a class="share-btn msg" id="share-msg" target="_blank" rel="noopener">Messenger</a>
+        <a class="share-btn imo" id="share-imo" target="_blank" rel="noopener">imo</a>
+      </div>
+      <button class="btn-ghost" id="scan-again-btn" data-i18n="scanAgain">Scan again</button>
+    </div>
+  </div>
+</section>
+
+<div id="toast" class="toast"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
